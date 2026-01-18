@@ -9,9 +9,10 @@ const AVATARS = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼',
 interface ProfileEditorProps {
     isOpen: boolean;
     onClose: () => void;
+    onUpdate?: (name: string, avatar: string) => void;
 }
 
-const ProfileEditor: React.FC<ProfileEditorProps> = ({ isOpen, onClose }) => {
+const ProfileEditor: React.FC<ProfileEditorProps> = ({ isOpen, onClose, onUpdate }) => {
     const { currentUser } = useUser();
     const [displayName, setDisplayName] = useState('');
     const [avatar, setAvatar] = useState('👤');
@@ -62,6 +63,7 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ isOpen, onClose }) => {
                 });
 
             if (error) throw error;
+            if (onUpdate) onUpdate(displayName, avatar);
             onClose();
         } catch (error) {
             console.error('Error saving profile:', error);

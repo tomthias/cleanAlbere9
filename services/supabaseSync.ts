@@ -93,7 +93,9 @@ export const syncPreferencesToSupabase = async (
   userName: Person,
   colors: Record<Person, string>,
   theme: 'light' | 'dark',
-  language: 'it' | 'en'
+  language: 'it' | 'en',
+  displayName?: string,
+  avatarUrl?: string
 ): Promise<void> => {
   if (!supabase) return
 
@@ -105,6 +107,8 @@ export const syncPreferencesToSupabase = async (
         color_preference: colors,
         theme_preference: theme,
         language_preference: language,
+        display_name: displayName,
+        avatar_url: avatarUrl,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'user_name'
@@ -118,7 +122,13 @@ export const syncPreferencesToSupabase = async (
 
 export const loadPreferencesFromSupabase = async (
   userName: Person
-): Promise<{ colors: Record<Person, string>, theme: 'light' | 'dark', language: 'it' | 'en' } | null> => {
+): Promise<{
+  colors: Record<Person, string>,
+  theme: 'light' | 'dark',
+  language: 'it' | 'en',
+  displayName?: string,
+  avatarUrl?: string
+} | null> => {
   if (!supabase) return null
 
   try {
@@ -138,7 +148,9 @@ export const loadPreferencesFromSupabase = async (
     return {
       colors: data.color_preference as Record<Person, string>,
       theme: data.theme_preference as 'light' | 'dark',
-      language: data.language_preference as 'it' | 'en'
+      language: data.language_preference as 'it' | 'en',
+      displayName: data.display_name,
+      avatarUrl: data.avatar_url
     }
   } catch (error) {
     console.error('❌ Errore loadPreferencesFromSupabase:', error)
@@ -161,6 +173,34 @@ export const subscribeToProgressUpdates = (
       { event: '*', schema: 'public', table: 'cleaning_progress' },
       () => {
         console.log('🔄 Rilevato cambiamento in real-time')
+        onUpdate()
+      }
+    )
+    .subscribe()
+
+  return () => {
+    subscription.unsubscribe()
+  }
+}
+
+export const subscribeToPreferenceUpdates = (
+  userName: Person,
+  onUpdate: () => void
+): (() => void) => {
+  if (!supabase) return () => { }
+
+  const subscription = supabase
+    .channel(`public:user_preferences:${userName}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'user_preferences',
+        filter: `user_name=eq.${userName}`
+      },
+      () => {
+        console.log('🔄 Preferenze aggiornate in real-time')
         onUpdate()
       }
     )

@@ -19,35 +19,35 @@ interface AreaCardProps {
 }
 
 export const areaSubTasks: Record<string, { it: string[], en: string[] }> = {
-  cucina: { 
-    it: ["Piani di lavoro", "Pulire lavandino", "Fai la lavastoviglie / togli le posate", "Tavolo", "Scopa e straccio"], 
-    en: ["Countertops", "Clean sink", "Dishwasher / Cutlery", "Table", "Mop and broom"] 
+  cucina: {
+    it: ["Piani di lavoro", "Pulire lavandino", "Fai la lavastoviglie / togli le posate", "Tavolo", "Scopa e straccio"],
+    en: ["Countertops", "Clean sink", "Dishwasher / Cutlery", "Table", "Mop and broom"]
   },
-  cestino: { 
-    it: ["Butta Umido", "Butta Plastica/Imballaggi", "Butta Carta", "Butta Indifferenziato", "Butta Vetro"], 
-    en: ["Organic waste", "Plastic/Packaging", "Paper", "General waste", "Glass"] 
+  cestino: {
+    it: ["Butta Umido", "Butta Plastica/Imballaggi", "Butta Carta", "Butta Indifferenziato", "Butta Vetro"],
+    en: ["Organic waste", "Plastic/Packaging", "Paper", "General waste", "Glass"]
   },
-  bagno1: { 
-    it: ["Sanitari", "Swiffer", "Straccio"], 
-    en: ["Sanitaryware", "Swiffer", "Mop"] 
+  bagno1: {
+    it: ["Sanitari", "Swiffer", "Straccio"],
+    en: ["Sanitaryware", "Swiffer", "Mop"]
   },
-  bagno2: { 
-    it: ["Sanitari", "Swiffer", "Straccio"], 
-    en: ["Sanitaryware", "Swiffer", "Mop"] 
+  bagno2: {
+    it: ["Sanitari", "Swiffer", "Straccio"],
+    en: ["Sanitaryware", "Swiffer", "Mop"]
   },
-  ingressoLavanderia: { 
-    it: ["Scopa", "Swiffer", "Straccio"], 
-    en: ["Broom", "Swiffer", "Mop"] 
+  ingressoLavanderia: {
+    it: ["Scopa", "Swiffer", "Straccio"],
+    en: ["Broom", "Swiffer", "Mop"]
   }
 };
 
-const AreaCard: React.FC<AreaCardProps> = ({ 
+const AreaCard: React.FC<AreaCardProps> = ({
   id,
-  label, 
-  iconName, 
-  assignee, 
-  isDone, 
-  isHighlighted, 
+  label,
+  iconName,
+  assignee,
+  isDone,
+  isHighlighted,
   isOverdue,
   lang,
   customColor
@@ -56,9 +56,9 @@ const AreaCard: React.FC<AreaCardProps> = ({
   const IconComponent = LucideIcons[iconName] || LucideIcons.HelpCircle;
 
   const getTheme = (color: string = 'slate') => {
-    return { 
-      text: `text-${color}-600 dark:text-${color}-400`, 
-      bg: `bg-${color}-50 dark:bg-${color}-900/20`, 
+    return {
+      text: `text-${color}-600 dark:text-${color}-400`,
+      bg: `bg-${color}-50 dark:bg-${color}-900/20`,
       border: `border-${color}-100 dark:border-${color}-800/30`,
     };
   };
@@ -71,14 +71,14 @@ const AreaCard: React.FC<AreaCardProps> = ({
   }[lang];
 
   return (
-    <div 
+    <div
       className={`group relative flex flex-col p-6 rounded-[2.5rem] border-[3px] transition-all duration-500 cursor-pointer select-none
-        ${isDone 
-          ? 'bg-slate-50 border-slate-200 opacity-60 grayscale-[0.5] dark:bg-slate-900/50 dark:border-slate-800' 
-          : isOverdue 
-            ? 'bg-white border-orange-200 shadow-2xl shadow-orange-100 scale-[1.03] dark:bg-slate-900 dark:border-orange-500/30 dark:shadow-orange-950/20' 
-            : isHighlighted 
-              ? 'bg-white border-indigo-200 shadow-2xl shadow-indigo-100 scale-[1.03] dark:bg-slate-900 dark:border-indigo-500/30 dark:shadow-indigo-950/20' 
+        ${isDone
+          ? 'bg-slate-50 border-slate-200 opacity-60 grayscale-[0.5] dark:bg-slate-900/50 dark:border-slate-800'
+          : isOverdue
+            ? 'bg-white border-orange-200 shadow-2xl shadow-orange-100 scale-[1.03] dark:bg-slate-900 dark:border-orange-500/30 dark:shadow-orange-950/20'
+            : isHighlighted
+              ? 'bg-white border-indigo-200 shadow-2xl shadow-indigo-100 scale-[1.03] dark:bg-slate-900 dark:border-indigo-500/30 dark:shadow-indigo-950/20'
               : 'bg-white border-slate-100 hover:border-indigo-100 hover:shadow-xl shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:hover:border-indigo-500/30 dark:shadow-none'
         }`}
     >
@@ -104,21 +104,15 @@ const AreaCard: React.FC<AreaCardProps> = ({
           </div>
         )}
       </div>
-      
+
       <div className="mb-4">
-        <h3 className={`text-4xl font-black tracking-tighter mb-2 transition-all duration-300 ${isDone ? 'text-slate-400 line-through decoration-4 dark:text-slate-600' : 'text-slate-900 dark:text-white'}`}>
+        <h3 className={`text-4xl font-black tracking-tighter transition-all duration-300 ${isDone ? 'text-slate-400 line-through decoration-4 dark:text-slate-600' : 'text-slate-900 dark:text-white'}`}>
           {label}
         </h3>
-        <div className={`text-[11px] font-black uppercase tracking-[0.25em] transition-colors duration-300 ${isDone ? 'text-slate-400/50 dark:text-slate-600/50' : 'text-slate-500 dark:text-slate-400'}`}>
-          {assignee}
-        </div>
       </div>
 
       <div className="mt-auto pt-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <div className="flex flex-col">
-          <span className={`text-[10px] font-bold uppercase tracking-widest leading-none mb-1 ${isDone ? 'text-slate-300 dark:text-slate-700' : 'text-slate-600 dark:text-slate-400'}`}>
-            {labels.responsible}
-          </span>
           <span className={`text-[11px] font-black ${theme.text}`}>{assignee.toUpperCase()}</span>
         </div>
         <div className={`text-xl font-black transition-transform group-hover:translate-x-1 ${isDone ? 'text-slate-300 dark:text-slate-700' : 'text-indigo-600/80 dark:text-indigo-400'}`}>

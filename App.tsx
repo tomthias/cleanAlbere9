@@ -130,6 +130,7 @@ const MainContent: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [userAvatar, setUserAvatar] = useState<string>('👤');
+  const [userDisplayName, setUserDisplayName] = useState<string>('');
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -158,21 +159,13 @@ const MainContent: React.FC = () => {
 
         if (currentUser) {
           const prefs = await loadPreferencesFromSupabase(currentUser);
+          console.log('🎨 Preferenze caricate:', prefs);
           if (prefs) {
             setUserColors(prefs.colors);
             setTheme(prefs.theme);
             setLang(prefs.language);
-          }
-
-          if (supabase) {
-            const { data, error } = await supabase
-              .from('user_preferences')
-              .select('avatar_url')
-              .eq('user_name', currentUser)
-              .maybeSingle();
-
-            if (error) console.error('❌ Errore caricamento avatar:', error);
-            if (data?.avatar_url) setUserAvatar(data.avatar_url);
+            if (prefs.displayName) setUserDisplayName(prefs.displayName);
+            if (prefs.avatarUrl) setUserAvatar(prefs.avatarUrl);
           }
         }
         setLastSynced(new Date());
@@ -202,14 +195,33 @@ const MainContent: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Sottoscrizione Preferenze
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const unsubscribe = subscribeToPreferenceUpdates(currentUser, () => {
+      loadPreferencesFromSupabase(currentUser).then(prefs => {
+        if (prefs) {
+          setUserColors(prefs.colors);
+          setTheme(prefs.theme);
+          setLang(prefs.language);
+          if (prefs.displayName) setUserDisplayName(prefs.displayName);
+          if (prefs.avatarUrl) setUserAvatar(prefs.avatarUrl);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   // Sincronizza preferenze
   useEffect(() => {
     if (!currentUser) return;
     localStorage.setItem('flatmate_colors', JSON.stringify(userColors));
     localStorage.setItem('flatmate_theme', theme);
 
-    syncPreferencesToSupabase(currentUser, userColors, theme, lang);
-  }, [userColors, theme, lang, currentUser]);
+    syncPreferencesToSupabase(currentUser, userColors, theme, lang, userDisplayName, userAvatar);
+  }, [userColors, theme, lang, currentUser, userDisplayName, userAvatar]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -295,7 +307,14 @@ const MainContent: React.FC = () => {
     <div className="max-w-7xl mx-auto p-4 md:p-12 pb-32 relative">
       <UserSelector />
       <SyncStatus isSyncing={isSyncing} isOnline={isOnline} lastSyncedAt={lastSynced} />
-      <ProfileEditor isOpen={showProfile} onClose={() => setShowProfile(false)} />
+      <ProfileEditor
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        onUpdate={(name, avatar) => {
+          setUserDisplayName(name);
+          setUserAvatar(avatar);
+        }}
+      />
 
       <header className="mb-8 md:mb-12 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -304,7 +323,7 @@ const MainContent: React.FC = () => {
           </h1>
           {currentUser && (
             <div className="text-sm font-bold text-slate-500 flex items-center gap-2">
-              <span>Ciao, {currentUser}</span>
+              <span>Ciao, {userDisplayName || currentUser}</span>
               <button onClick={() => setShowProfile(true)} className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                 {userAvatar !== '👤' ? userAvatar : <UserCircle size={14} />}
               </button>
