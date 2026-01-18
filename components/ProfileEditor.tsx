@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Check, X, Smile } from 'lucide-react';
-import { Person } from '../types';
+import { Check, X } from 'lucide-react';
 import { useUser } from './UserContext';
 import { supabase } from '../lib/supabase';
-
-const AVATARS = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', 'dV', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', 'ANT', '🕷', '🕸', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', 'orangutan', 'mamoth', 'elephant', 'hippopotamus', 'rhinoceros', 'camel', 'dromedary', 'giraffe', 'buffalo', 'mammoth', 'equine', 'pig', 'boar', 'pig_nose', 'ram', 'sheep', 'goat', 'dromedary_camel', 'bactrian_camel', 'llama', 'alpaca', 'vicuna', 'guanaco'];
 
 interface ProfileEditorProps {
     isOpen: boolean;

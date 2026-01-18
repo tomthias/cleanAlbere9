@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { isCurrentWeek } from './services/calendarLogic';
 import { AREAS, PEOPLE } from './constants';
 import AreaCard, { areaSubTasks } from './components/AreaCard';
@@ -173,6 +173,13 @@ const MainContent: React.FC = () => {
   };
 
   const colorOptions = ['blue', 'rose', 'emerald', 'violet', 'orange', 'amber', 'cyan', 'fuchsia', 'slate'];
+
+  // Applica tema al DOM
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+  }, [theme]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-12 pb-32 relative">

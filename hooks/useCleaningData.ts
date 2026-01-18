@@ -161,18 +161,29 @@ export const useCleaningData = (currentUser: Person | null) => {
 
     const toggleTask = async (weekId: number, areaId: string) => {
         if (!currentUser) return;
+
+        // Salva stato precedente per revert
+        const previousProgress = progress;
+
         const isCompleted = !progress[weekId]?.[areaId as keyof UserProgress[number]];
         const newProgress = {
             ...progress,
             [weekId]: { ...(progress[weekId] || {}), [areaId]: isCompleted }
         };
+
+        // Optimistic update
         setProgress(newProgress);
+        localStorage.setItem('cleaning_progress_v2', JSON.stringify(newProgress));
         setIsSyncing(true);
+
         try {
             await updateTaskStatus(weekId, areaId, isCompleted, currentUser);
             setLastSynced(new Date());
         } catch (error) {
-            console.error('Task toggle sync failed:', error);
+            console.error('Task toggle sync failed, reverting:', error);
+            // Revert su errore
+            setProgress(previousProgress);
+            localStorage.setItem('cleaning_progress_v2', JSON.stringify(previousProgress));
         } finally {
             setIsSyncing(false);
         }

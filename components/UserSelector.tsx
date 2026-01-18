@@ -9,16 +9,15 @@ interface UserSelectorProps {
 }
 
 const UserSelector: React.FC<UserSelectorProps> = ({ onSelect }) => {
-    const { currentUser, setCurrentUser } = useUser();
-
-    // Se l'utente è già settato, non mostrare nulla (a meno che non venga usato in un settings menu)
-    // Ma questo componente è pensato principalmente come modale bloccante o overlay iniziale
+    const { currentUser, setCurrentUser, isLoading } = useUser();
 
     const handleSelect = (person: Person) => {
         setCurrentUser(person);
         if (onSelect) onSelect();
     };
 
+    // Non mostrare nulla durante il caricamento iniziale (evita flash)
+    if (isLoading) return null;
     if (currentUser && !onSelect) return null;
 
     return (
