@@ -66,8 +66,8 @@ const AreaCard: React.FC<AreaCardProps> = ({
   const theme = getTheme(customColor);
 
   const labels = {
-    it: { responsible: "Responsabile", overdue: "Ritardo", ongoing: "In corso" },
-    en: { responsible: "Assignee", overdue: "Overdue", ongoing: "Ongoing" }
+    it: { overdue: "Ritardo", ongoing: "In corso" },
+    en: { overdue: "Overdue", ongoing: "Ongoing" }
   }[lang];
 
   return (
