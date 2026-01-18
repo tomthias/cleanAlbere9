@@ -164,14 +164,16 @@ const MainContent: React.FC = () => {
             setLang(prefs.language);
           }
 
-          const { data, error } = await supabase!
-            .from('user_preferences')
-            .select('avatar_url')
-            .eq('user_name', currentUser)
-            .maybeSingle();
+          if (supabase) {
+            const { data, error } = await supabase
+              .from('user_preferences')
+              .select('avatar_url')
+              .eq('user_name', currentUser)
+              .maybeSingle();
 
-          if (error) console.error('❌ Errore caricamento avatar:', error);
-          if (data?.avatar_url) setUserAvatar(data.avatar_url);
+            if (error) console.error('❌ Errore caricamento avatar:', error);
+            if (data?.avatar_url) setUserAvatar(data.avatar_url);
+          }
         }
         setLastSynced(new Date());
       } catch (error) {
