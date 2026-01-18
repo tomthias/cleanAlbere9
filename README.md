@@ -8,7 +8,7 @@ Applicazione web per la gestione del calendario delle pulizie condiviso tra coin
 
 ## 🚀 Demo Live
 
-L'applicazione è disponibile su GitHub Pages: [Visualizza Demo](https://tomthias.github.io/claean-albere9/)
+L'applicazione è disponibile su GitHub Pages: [Visualizza Demo](https://tomthias.github.io/cleanAlbere9/)
 
 ## 📋 Prerequisiti
 
@@ -19,8 +19,8 @@ L'applicazione è disponibile su GitHub Pages: [Visualizza Demo](https://tomthia
 
 1. **Clona la repository:**
    ```bash
-   git clone https://github.com/tomthias/claean-albere9.git
-   cd claean-albere9
+   git clone https://github.com/tomthias/cleanAlbere9.git
+   cd cleanAlbere9
    ```
 
 2. **Installa le dipendenze:**
@@ -55,11 +55,11 @@ Il progetto è già configurato per il deploy automatico su GitHub Pages tramite
 
 ### Setup Iniziale
 
-Il progetto è già configurato per la repository [claean-albere9](https://github.com/tomthias/claean-albere9).
+Il progetto è già configurato per la repository [cleanAlbere9](https://github.com/tomthias/cleanAlbere9).
 
 **Collega la repository locale a GitHub:**
 ```bash
-git remote add origin https://github.com/tomthias/claean-albere9.git
+git remote add origin https://github.com/tomthias/cleanAlbere9.git
 git branch -M main
 git add .
 git commit -m "Initial commit"
@@ -81,8 +81,8 @@ Puoi anche attivare manualmente il deploy andando su Actions → Deploy to GitHu
 
 ## 📝 Note
 
-- Repository GitHub: [tomthias/claean-albere9](https://github.com/tomthias/claean-albere9)
-- GitHub Pages URL: https://tomthias.github.io/claean-albere9/
+- Repository GitHub: [tomthias/cleanAlbere9](https://github.com/tomthias/cleanAlbere9)
+- GitHub Pages URL: https://tomthias.github.io/cleanAlbere9/
 - Le variabili d'ambiente sensibili (come `GEMINI_API_KEY`) non devono essere committate nel repository
 
 ## 🛠️ Tecnologie Utilizzate

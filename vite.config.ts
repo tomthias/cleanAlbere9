@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     // Per GitHub Pages: usa il nome della repository come base path
-    // Repository: claean-albere9
-    const basePath = env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/claean-albere9/' : '/');
+    // Repository: cleanAlbere9
+    const basePath = env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/cleanAlbere9/' : '/');
     return {
       base: basePath,
       server: {

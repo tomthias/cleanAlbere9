@@ -35,7 +35,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          VITE_BASE_PATH: /claean-albere9/
+          VITE_BASE_PATH: /cleanAlbere9/
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
