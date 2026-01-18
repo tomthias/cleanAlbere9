@@ -20,6 +20,14 @@ import SyncStatus from './components/SyncStatus';
 import ProfileEditor from './components/ProfileEditor';
 import * as LucideIcons from 'lucide-react';
 import { supabase } from './lib/supabase';
+import {
+  loadSwaps,
+  subscribeToSwapUpdates,
+  createSwapRequest,
+  acceptSwapRequest,
+  cancelSwapRequest,
+  SwapRequest
+} from './services/swapService';
 
 const {
   ChevronLeft,
@@ -39,7 +47,9 @@ const {
   ChevronDown,
   Sun,
   Moon,
-  UserCircle
+  UserCircle,
+  ArrowLeftRight,
+  Clock
 } = LucideIcons;
 
 const translations = {
@@ -60,7 +70,12 @@ const translations = {
     addToCalendar: "Aggiungi al calendario",
     showTasks: "Mostra dettagli",
     hideTasks: "Nascondi dettagli",
-    profile: "Profilo"
+    profile: "Profilo",
+    requestSwap: "Richiedi Cambio",
+    cancelSwap: "Annulla Richiesta",
+    acceptSwap: "Accetta Cambio",
+    pendingSwap: "Richiesta in sospeso",
+    swappedWith: "Sostituito da"
   },
   en: {
     week: "Week",
@@ -79,7 +94,12 @@ const translations = {
     addToCalendar: "Add to Calendar",
     showTasks: "Show details",
     hideTasks: "Hide details",
-    profile: "Profile"
+    profile: "Profile",
+    requestSwap: "Request Swap",
+    cancelSwap: "Cancel Request",
+    acceptSwap: "Accept Swap",
+    pendingSwap: "Pending request",
+    swappedWith: "Replaced by"
   }
 };
 
@@ -109,6 +129,7 @@ const MainContent: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<{ weekId: number, areaId: string } | null>(null);
   const [subTaskProgress, setSubTaskProgress] = useState<Record<string, boolean>>({});
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+  const [swaps, setSwaps] = useState<SwapRequest[]>([]);
 
   const [userColors, setUserColors] = useState<Record<Person, string>>(() => {
     const saved = localStorage.getItem('flatmate_colors');
@@ -178,6 +199,10 @@ const MainContent: React.FC = () => {
             localStorage.setItem('flatmate_theme', prefs.theme);
           }
         }
+
+        const activeSwaps = await loadSwaps();
+        setSwaps(activeSwaps);
+
         setLastSynced(new Date());
       } catch (error) {
         console.error('Errore caricamento:', error);
@@ -190,6 +215,14 @@ const MainContent: React.FC = () => {
 
     loadData();
   }, [currentUser]);
+
+  // Sottoscrizione Swaps
+  useEffect(() => {
+    const unsubscribe = subscribeToSwapUpdates(() => {
+      loadSwaps().then(updatedSwaps => setSwaps(updatedSwaps));
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Sottoscrizione real-time
   useEffect(() => {
@@ -286,36 +319,53 @@ const MainContent: React.FC = () => {
   const isNow = isCurrentWeek(currentViewData.startDate, currentViewData.endDate);
   const isPast = new Date() > currentViewData.endDate;
 
+  const activeWeeks = useMemo(() => {
+    return weeks.map(week => {
+      const weekSwaps = swaps.filter(s => s.week_id === week.id && s.status === 'accepted');
+      const newWeek = { ...week };
+      weekSwaps.forEach(swap => {
+        if (swap.swapped_with) {
+          (newWeek as any)[swap.area_id] = swap.swapped_with;
+        }
+      });
+      return newWeek;
+    });
+  }, [weeks, swaps]);
+
+  const currentViewDataSwapped = activeWeeks[viewIdx];
+
   const sortedAreas = useMemo(() => {
     const areasWithAssignees = AREAS.map(area => ({
       ...area,
-      assignee: currentViewData[area.id as keyof Omit<CleaningWeek, 'id' | 'startDate' | 'endDate'>]
+      assignee: currentViewDataSwapped[area.id as keyof Omit<CleaningWeek, 'id' | 'startDate' | 'endDate'>],
+      pendingSwap: swaps.find(s => s.week_id === currentViewDataSwapped.id && s.area_id === area.id && s.status === 'pending')
     }));
 
     if (isSorted) {
       return [...areasWithAssignees].sort((a, b) => a.assignee.localeCompare(b.assignee));
     }
     return areasWithAssignees;
-  }, [currentViewData, isSorted]);
+  }, [currentViewDataSwapped, isSorted, swaps]);
 
   const stats = useMemo(() => {
-    const weekProgress = progress[currentViewData.id] || {};
+    const weekProgress = progress[currentViewDataSwapped.id] || {};
     const completed = Object.values(weekProgress).filter(Boolean).length;
     const total = AREAS.length;
     return { completed, total, percentage: (completed / total) * 100 };
-  }, [progress, currentViewData]);
+  }, [progress, currentViewDataSwapped]);
 
   const colorOptions = ['blue', 'rose', 'emerald', 'violet', 'orange', 'amber', 'cyan', 'fuchsia', 'slate'];
 
   const activeTaskData = useMemo(() => {
     if (!selectedTask) return null;
-    const week = weeks.find(w => w.id === selectedTask.weekId);
+    const week = activeWeeks.find(w => w.id === selectedTask.weekId);
     const area = AREAS.find(a => a.id === selectedTask.areaId);
     if (!week || !area) return null;
     const assignee = week[area.id as keyof Omit<CleaningWeek, 'id' | 'startDate' | 'endDate'>] as Person;
     const isDone = !!progress[week.id]?.[area.id as keyof UserProgress[number]];
-    return { week, area, assignee, isDone };
-  }, [selectedTask, weeks, progress]);
+    const pendingSwap = swaps.find(s => s.week_id === week.id && s.area_id === area.id && s.status === 'pending');
+    return { week, area, assignee, isDone, pendingSwap };
+  }, [selectedTask, activeWeeks, progress, swaps]);
 
   const handleAddToCalendar = () => {
     if (!activeTaskData) return;
@@ -400,11 +450,11 @@ const MainContent: React.FC = () => {
                 </button>
                 <div className="text-center">
                   <div className={`inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border mb-3 ${isNow ? 'bg-indigo-500 border-indigo-400' : 'bg-white/5 border-white/10 text-slate-400'}`}>
-                    {t.week.toUpperCase()} {currentViewData.id}
+                    {t.week.toUpperCase()} {currentViewDataSwapped.id}
                   </div>
-                  <h2 className="text-xl md:text-3xl font-black tracking-tighter">{formatDateRange(currentViewData.startDate, currentViewData.endDate, lang)}</h2>
+                  <h2 className="text-xl md:text-3xl font-black tracking-tighter">{formatDateRange(currentViewDataSwapped.startDate, currentViewDataSwapped.endDate, lang)}</h2>
                 </div>
-                <button disabled={viewIdx === weeks.length - 1} onClick={() => setViewIdx(v => v + 1)} className="p-3 md:p-4 bg-white/5 hover:bg-white/10 rounded-2xl disabled:opacity-10 transition-all border border-white/10">
+                <button disabled={viewIdx === activeWeeks.length - 1} onClick={() => setViewIdx(v => v + 1)} className="p-3 md:p-4 bg-white/5 hover:bg-white/10 rounded-2xl disabled:opacity-10 transition-all border border-white/10">
                   <ChevronRight size={24} />
                 </button>
               </div>
@@ -448,11 +498,16 @@ const MainContent: React.FC = () => {
                     onToggle={() => { }}
                     isHighlighted={isNow}
                     isOverdue={isPast && !isDone}
-                    startDate={currentViewData.startDate}
-                    endDate={currentViewData.endDate}
+                    startDate={currentViewDataSwapped.startDate}
+                    endDate={currentViewDataSwapped.endDate}
                     lang={lang}
                     customColor={userColors[area.assignee]}
                   />
+                  {area.pendingSwap && (
+                    <div className="absolute top-4 right-4 bg-amber-500 text-white p-1.5 rounded-full shadow-lg animate-pulse">
+                      <Clock size={12} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -461,7 +516,7 @@ const MainContent: React.FC = () => {
       ) : (
         <div onClick={(e) => isActionLocked && e.stopPropagation()}>
           <MonthlyCalendar
-            weeks={weeks}
+            weeks={activeWeeks}
             progress={progress}
             onToggle={(weekId, areaId) => {
               if (isActionLocked) return;
@@ -498,6 +553,12 @@ const MainContent: React.FC = () => {
                 <h3 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
                   {activeTaskData.assignee}
                 </h3>
+                {activeTaskData.pendingSwap && (
+                  <div className="mt-2 flex items-center gap-2 text-amber-500 font-bold text-xs uppercase tracking-widest">
+                    <Clock size={14} />
+                    {t.pendingSwap}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -565,6 +626,57 @@ const MainContent: React.FC = () => {
                 <CalendarPlus size={18} />
                 {t.addToCalendar.toUpperCase()}
               </button>
+
+              {/* Swap Button */}
+              {currentUser && (
+                <div className="mt-6 border-t dark:border-white/5 pt-6">
+                  {!activeTaskData.pendingSwap ? (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`${t.requestSwap}?`)) {
+                          await createSwapRequest(activeTaskData.week.id, activeTaskData.area.id, activeTaskData.assignee);
+                          closeModal();
+                        }
+                      }}
+                      className="w-full py-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-900/30 text-indigo-500 font-black text-[11px] tracking-widest flex items-center justify-center gap-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all"
+                    >
+                      <ArrowLeftRight size={16} />
+                      {t.requestSwap.toUpperCase()}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeTaskData.pendingSwap.original_person === currentUser ? (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await cancelSwapRequest(activeTaskData.pendingSwap!.id);
+                            closeModal();
+                          }}
+                          className="w-full py-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 font-black text-[11px] tracking-widest flex items-center justify-center gap-3 transition-all"
+                        >
+                          <X size={16} />
+                          {t.cancelSwap.toUpperCase()}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`${t.acceptSwap}?`)) {
+                              await acceptSwapRequest(activeTaskData.pendingSwap!.id, currentUser as Person);
+                              closeModal();
+                            }
+                          }}
+                          className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-black text-[11px] tracking-widest flex items-center justify-center gap-3 transition-all shadow-lg shadow-emerald-200 dark:shadow-none"
+                        >
+                          <Check size={16} />
+                          {t.acceptSwap.toUpperCase()}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
