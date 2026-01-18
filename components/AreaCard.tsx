@@ -47,6 +47,7 @@ const AreaCard: React.FC<AreaCardProps> = ({
   iconName,
   assignee,
   isDone,
+  onToggle,
   isHighlighted,
   isOverdue,
   lang,
@@ -90,17 +91,38 @@ const AreaCard: React.FC<AreaCardProps> = ({
         </div>
 
         {isDone ? (
-          <div className="bg-emerald-500 text-white rounded-full p-2 shadow-lg shadow-emerald-200 ring-4 ring-emerald-50 dark:ring-emerald-950/30">
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="group/check bg-emerald-500 text-white rounded-full p-2 shadow-lg shadow-emerald-200 ring-4 ring-emerald-50 dark:ring-emerald-950/30 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+          >
             <LucideIcons.Check size={18} strokeWidth={4} />
           </div>
-        ) : isOverdue ? (
-          <div className="flex items-center gap-1.5 bg-orange-600 text-white rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-tighter shadow-lg shadow-orange-200 dark:shadow-none">
-            <LucideIcons.AlertCircle size={14} />
-            <span>{labels.overdue}</span>
-          </div>
-        ) : isHighlighted && (
-          <div className="bg-indigo-600 text-white rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-tighter shadow-lg shadow-indigo-200 dark:shadow-none">
-            {labels.ongoing}
+        ) : (
+          <div className="flex items-center gap-3">
+            {isOverdue ? (
+              <div className="flex items-center gap-1.5 bg-orange-600 text-white rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-tighter shadow-lg shadow-orange-200 dark:shadow-none">
+                <LucideIcons.AlertCircle size={14} />
+                <span>{labels.overdue}</span>
+              </div>
+            ) : isHighlighted && (
+              <div className="bg-indigo-600 text-white rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-tighter shadow-lg shadow-indigo-200 dark:shadow-none">
+                {labels.ongoing}
+              </div>
+            )}
+
+            {/* Quick Action Checkbox */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center text-transparent hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all cursor-pointer active:scale-90"
+            >
+              <LucideIcons.Check size={20} strokeWidth={4} />
+            </div>
           </div>
         )}
       </div>

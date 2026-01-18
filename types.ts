@@ -17,3 +17,13 @@ export interface UserProgress {
     [area in keyof Omit<CleaningWeek, 'id' | 'startDate' | 'endDate'>]?: boolean;
   };
 }
+
+export interface SwapRequest {
+  id: string;
+  week_id: number;
+  area_id: string;
+  original_person: Person;
+  swapped_with: Person | null;
+  status: 'pending' | 'accepted' | 'cancelled';
+  created_at: string;
+}

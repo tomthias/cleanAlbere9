@@ -1,15 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Person } from '../types';
-
-export interface SwapRequest {
-    id: string;
-    week_id: number;
-    area_id: string;
-    original_person: Person;
-    swapped_with: Person | null;
-    status: 'pending' | 'accepted' | 'cancelled';
-    created_at: string;
-}
+import { Person, SwapRequest } from '../types';
 
 /**
  * Creates a new swap request
