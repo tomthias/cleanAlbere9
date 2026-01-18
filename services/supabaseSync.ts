@@ -10,11 +10,13 @@ export const updateTaskStatus = async (
   isCompleted: boolean,
   completedBy: Person
 ): Promise<void> => {
-  if (!supabase) return
+  if (!supabase) return;
+
+  console.log(`📡 Sincronizzazione task: ${areaId} (Settimana ${weekId}) -> ${isCompleted ? 'Fatto' : 'Da fare'} da ${completedBy}`);
 
   try {
     if (isCompleted) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('cleaning_progress')
         .upsert({
           week_id: weekId,
@@ -24,52 +26,65 @@ export const updateTaskStatus = async (
         }, {
           onConflict: 'week_id,area_id'
         })
+        .select();
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Errore upsert progress:', error);
+        throw error;
+      }
+      console.log('✅ Upsert completato:', data);
     } else {
       const { error } = await supabase
         .from('cleaning_progress')
         .delete()
         .eq('week_id', weekId)
-        .eq('area_id', areaId)
+        .eq('area_id', areaId);
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Errore delete progress:', error);
+        throw error;
+      }
+      console.log('✅ Delete completato');
     }
   } catch (error) {
-    console.error('❌ Errore updateTaskStatus:', error)
-    throw error
+    console.error('❌ Fallimento critico sincronizzazione:', error);
+    throw error;
   }
-}
+};
 
 /**
  * Carica tutto il progresso
  */
-export const loadProgressFromSupabase = async (): Promise<UserProgress> => {
-  if (!supabase) return {}
+export const loadProgressFromSupabase = async (): Promise<UserProgress | null> => {
+  if (!supabase) return null;
 
   try {
     const { data, error } = await supabase
       .from('cleaning_progress')
       .select('week_id, area_id')
 
-    if (error) throw error
+    if (error) {
+      console.error('❌ Errore loadProgressFromSupabase:', error);
+      return null;
+    }
 
     // Converti in formato UserProgress
-    const progress: UserProgress = {}
+    const progress: UserProgress = {};
 
     data?.forEach((item) => {
       if (!progress[item.week_id]) {
-        progress[item.week_id] = {}
+        progress[item.week_id] = {};
       }
-      progress[item.week_id][item.area_id as keyof UserProgress[number]] = true
-    })
+      progress[item.week_id][item.area_id as keyof UserProgress[number]] = true;
+    });
 
-    return progress
+    console.log(`📦 Caricati ${data?.length || 0} task completati da Supabase`);
+    return progress;
   } catch (error) {
-    console.error('❌ Errore loadProgressFromSupabase:', error)
-    return {}
+    console.error('❌ Errore critico loadProgressFromSupabase:', error);
+    return null;
   }
-}
+};
 
 /**
  * Gestione Preferenze

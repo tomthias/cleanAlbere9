@@ -146,9 +146,12 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setIsSyncing(true);
+      console.log('🔄 Avvio caricamento dati per:', currentUser);
       try {
         const supabaseProgress = await loadProgressFromSupabase();
-        if (supabaseProgress && Object.keys(supabaseProgress).length > 0) {
+        console.log('📦 Dati ricevuto da Supabase:', supabaseProgress);
+
+        if (supabaseProgress !== null) {
           setProgress(supabaseProgress);
           localStorage.setItem('cleaning_progress_v2', JSON.stringify(supabaseProgress));
         }
@@ -161,8 +164,13 @@ const MainContent: React.FC = () => {
             setLang(prefs.language);
           }
 
-          // Load avatar separately if needed or part of prefs if you updated loadPreferencesFromSupabase
-          const { data } = await supabase!.from('user_preferences').select('avatar_url').eq('user_name', currentUser).single();
+          const { data, error } = await supabase!
+            .from('user_preferences')
+            .select('avatar_url')
+            .eq('user_name', currentUser)
+            .maybeSingle();
+
+          if (error) console.error('❌ Errore caricamento avatar:', error);
           if (data?.avatar_url) setUserAvatar(data.avatar_url);
         }
         setLastSynced(new Date());
@@ -179,10 +187,14 @@ const MainContent: React.FC = () => {
   // Sottoscrizione real-time
   useEffect(() => {
     const unsubscribe = subscribeToProgressUpdates(() => {
+      console.log('🔔 Aggiornamento real-time ricevuto!');
       loadProgressFromSupabase().then(updatedProgress => {
-        setProgress(updatedProgress);
-        localStorage.setItem('cleaning_progress_v2', JSON.stringify(updatedProgress));
-        setLastSynced(new Date());
+        if (updatedProgress !== null) {
+          console.log('📥 Progresso aggiornato via real-time:', updatedProgress);
+          setProgress(updatedProgress);
+          localStorage.setItem('cleaning_progress_v2', JSON.stringify(updatedProgress));
+          setLastSynced(new Date());
+        }
       });
     });
     return () => unsubscribe();
