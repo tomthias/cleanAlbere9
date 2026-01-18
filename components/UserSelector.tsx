@@ -22,7 +22,7 @@ const UserSelector: React.FC<UserSelectorProps> = ({ onSelect }) => {
     if (currentUser && !onSelect) return null;
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 touch-none" onClick={(e) => e.stopPropagation()}>
             <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md"></div>
             <div className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-md shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
                 <div className="p-10 text-center">

@@ -132,6 +132,10 @@ const MainContent: React.FC = () => {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [userAvatar, setUserAvatar] = useState<string>('👤');
   const [userDisplayName, setUserDisplayName] = useState<string>('');
+  const [isActionLocked, setIsActionLocked] = useState(false);
+
+  // Ref per evitare loop di sincronizzazione durante il caricamento iniziale
+  const isInitialLoading = React.useRef(true);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -148,6 +152,7 @@ const MainContent: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setIsSyncing(true);
+      isInitialLoading.current = true;
       console.log('🔄 Avvio caricamento dati per:', currentUser);
       try {
         const supabaseProgress = await loadProgressFromSupabase();
@@ -167,6 +172,10 @@ const MainContent: React.FC = () => {
             setLang(prefs.language);
             if (prefs.displayName) setUserDisplayName(prefs.displayName);
             if (prefs.avatarUrl) setUserAvatar(prefs.avatarUrl);
+
+            // Aggiorna localstorage
+            localStorage.setItem('flatmate_colors', JSON.stringify(prefs.colors));
+            localStorage.setItem('flatmate_theme', prefs.theme);
           }
         }
         setLastSynced(new Date());
@@ -174,6 +183,8 @@ const MainContent: React.FC = () => {
         console.error('Errore caricamento:', error);
       } finally {
         setIsSyncing(false);
+        // Ritardo per assicurarsi che i setter siano processati
+        setTimeout(() => { isInitialLoading.current = false; }, 100);
       }
     };
 
@@ -215,20 +226,28 @@ const MainContent: React.FC = () => {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Sincronizza preferenze
+  // Sincronizza preferenze (Debounced e Optimistic)
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || isInitialLoading.current) return;
+
+    // Aggiornamento locale immediato
     localStorage.setItem('flatmate_colors', JSON.stringify(userColors));
     localStorage.setItem('flatmate_theme', theme);
 
-    syncPreferencesToSupabase(currentUser, userColors, theme, lang, userDisplayName, userAvatar);
+    const syncTimeout = setTimeout(() => {
+      syncPreferencesToSupabase(currentUser, userColors, theme, lang, userDisplayName, userAvatar)
+        .then(() => setLastSynced(new Date()))
+        .catch(err => console.error("Sync failed:", err));
+    }, 1000); // 1 secondo di debouncing per evitare troppe scritture al cambio colore rapido
+
+    return () => clearTimeout(syncTimeout);
   }, [userColors, theme, lang, currentUser, userDisplayName, userAvatar]);
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-  }, [theme]);
+  const closeModal = () => {
+    setSelectedTask(null);
+    setIsActionLocked(true);
+    setTimeout(() => setIsActionLocked(false), 350); // Blocca click fantasma per 350ms
+  };
 
   const handleToggleTask = async (weekId: number, areaId: string) => {
     if (!currentUser) return;
@@ -336,10 +355,17 @@ const MainContent: React.FC = () => {
           <button onClick={() => setShowProfile(true)} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all md:hidden">
             <UserCircle size={18} />
           </button>
-          <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all">
+          <button
+            onClick={() => setTheme(prev => {
+              const next = prev === 'light' ? 'dark' : 'light';
+              localStorage.setItem('flatmate_theme', next); // Optimistic force
+              return next;
+            })}
+            className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 touch-manipulation"
+          >
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
-          <button onClick={() => setShowSettings(true)} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all">
+          <button onClick={() => setShowSettings(true)} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 touch-manipulation">
             <Settings size={18} />
           </button>
           <button onClick={() => setLang(l => l === 'it' ? 'en' : 'it')} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all flex items-center gap-2">
@@ -400,7 +426,9 @@ const MainContent: React.FC = () => {
             {sortedAreas.map(area => {
               const isDone = !!progress[currentViewData.id]?.[area.id as keyof UserProgress[number]];
               return (
-                <div key={area.id} onClick={() => {
+                <div key={area.id} onClick={(e) => {
+                  if (isActionLocked) return;
+                  e.stopPropagation();
                   setSubTaskProgress({});
                   setIsAccordionOpen(false);
                   setSelectedTask({ weekId: currentViewData.id, areaId: area.id });
@@ -425,13 +453,24 @@ const MainContent: React.FC = () => {
           </section>
         </div>
       ) : (
-        <MonthlyCalendar weeks={weeks} progress={progress} onToggle={handleToggleTask} lang={lang} customColors={userColors} />
+        <div onClick={(e) => isActionLocked && e.stopPropagation()}>
+          <MonthlyCalendar
+            weeks={weeks}
+            progress={progress}
+            onToggle={(weekId, areaId) => {
+              if (isActionLocked) return;
+              handleToggleTask(weekId, areaId);
+            }}
+            lang={lang}
+            customColors={userColors}
+          />
+        </div>
       )}
 
       {/* Task Detail Modal */}
       {selectedTask && activeTaskData && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 overflow-hidden">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md dark:bg-slate-950/80" onClick={() => setSelectedTask(null)}></div>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 overflow-hidden touch-none" onClick={(e) => { e.stopPropagation(); closeModal(); }}>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md dark:bg-slate-950/80"></div>
           <div className="relative bg-white dark:bg-slate-900 rounded-[3rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col border dark:border-white/10">
 
             {/* Modal Header */}
@@ -441,7 +480,7 @@ const MainContent: React.FC = () => {
                   {/* @ts-ignore */}
                   {React.createElement(LucideIcons[activeTaskData.area.iconName] || Info, { size: 40, strokeWidth: 2.5 })}
                 </div>
-                <button onClick={() => setSelectedTask(null)} className="p-3 text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); closeModal(); }} className="p-3 text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -478,26 +517,21 @@ const MainContent: React.FC = () => {
                 <div className={`transition-all duration-300 ease-in-out ${isAccordionOpen ? 'max-h-96 opacity-100 pb-6 px-6' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                   <div className="space-y-1.5 pt-2">
                     {(areaSubTasks[activeTaskData.area.id]?.[lang] || []).map((subTask, idx) => (
-                      <label
+                      <div
                         key={idx}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSubTaskProgress(prev => ({ ...prev, [idx]: !prev[idx] }));
+                        }}
                         className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group hover:bg-white dark:hover:bg-slate-800 ${subTaskProgress[idx] ? 'bg-white/50 dark:bg-slate-800/50' : ''}`}
                       >
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={!!subTaskProgress[idx]}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setSubTaskProgress(prev => ({ ...prev, [idx]: !prev[idx] }));
-                          }}
-                        />
                         <div className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all ${subTaskProgress[idx] ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-slate-700 text-transparent group-hover:border-indigo-400'}`}>
                           <Check size={14} strokeWidth={4} />
                         </div>
                         <span className={`text-[13px] font-bold ${subTaskProgress[idx] ? 'text-slate-400 dark:text-slate-600 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                           {subTask}
                         </span>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -507,9 +541,10 @@ const MainContent: React.FC = () => {
             {/* Modal Actions */}
             <div className="p-8 md:p-12 pt-4 flex-shrink-0 space-y-4">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   handleToggleTask(activeTaskData.week.id, activeTaskData.area.id);
-                  setSelectedTask(null);
+                  closeModal();
                 }}
                 className={`w-full py-5 rounded-[1.8rem] font-black text-sm tracking-widest flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-xl ${activeTaskData.isDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'bg-emerald-500 text-white shadow-emerald-200 dark:shadow-none'}`}
               >
@@ -531,16 +566,16 @@ const MainContent: React.FC = () => {
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowSettings(false)}></div>
-          <div className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border dark:border-white/10">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 touch-none" onClick={(e) => { e.stopPropagation(); setShowSettings(false); setIsActionLocked(true); setTimeout(() => setIsActionLocked(false), 350); }}>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+          <div className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border dark:border-white/10" onClick={(e) => e.stopPropagation()}>
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl"><Palette size={20} /></div>
                   <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{t.settings}</h2>
                 </div>
-                <button onClick={() => setShowSettings(false)} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={20} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setShowSettings(false); setIsActionLocked(true); setTimeout(() => setIsActionLocked(false), 350); }} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={20} /></button>
               </div>
               <div className="space-y-6 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
                 {PEOPLE.map(person => (
@@ -550,8 +585,12 @@ const MainContent: React.FC = () => {
                       {colorOptions.map(color => (
                         <button
                           key={color}
-                          onClick={() => setUserColors(prev => ({ ...prev, [person]: color }))}
-                          className={`w-8 h-8 rounded-full border-4 transition-all ${userColors[person] === color ? 'border-indigo-600 dark:border-indigo-400 scale-110' : 'border-white dark:border-slate-800 hover:scale-105 shadow-sm'}`}
+                          onClick={() => setUserColors(prev => {
+                            const next = { ...prev, [person]: color };
+                            localStorage.setItem('flatmate_colors', JSON.stringify(next));
+                            return next;
+                          })}
+                          className={`w-10 h-10 rounded-full border-4 transition-all active:scale-90 touch-manipulation ${userColors[person] === color ? 'border-indigo-600 dark:border-indigo-400 scale-110' : 'border-white dark:border-slate-800 hover:scale-105 shadow-sm'}`}
                           style={{ backgroundColor: `var(--tw-color-${color}-500, ${color === 'emerald' ? '#10b981' : color === 'violet' ? '#8b5cf6' : color === 'rose' ? '#f43f5e' : color})` }}
                         />
                       ))}
@@ -559,7 +598,7 @@ const MainContent: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setShowSettings(false)} className="w-full mt-10 bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 dark:shadow-none">{t.save.toUpperCase()}</button>
+              <button onClick={(e) => { e.stopPropagation(); setShowSettings(false); setIsActionLocked(true); setTimeout(() => setIsActionLocked(false), 350); }} className="w-full mt-10 bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 dark:shadow-none">{t.save.toUpperCase()}</button>
             </div>
           </div>
         </div>
