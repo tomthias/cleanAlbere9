@@ -11,6 +11,7 @@ import {
   loadProgressFromSupabase,
   syncPreferencesToSupabase,
   subscribeToProgressUpdates,
+  subscribeToPreferenceUpdates,
   loadPreferencesFromSupabase
 } from './services/supabaseSync';
 import { UserProvider, useUser } from './components/UserContext';
