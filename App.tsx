@@ -1,22 +1,35 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { generateCalendar, isCurrentWeek, formatDateRange } from './services/calendarLogic';
 import { AREAS, PEOPLE } from './constants';
 import AreaCard, { areaSubTasks } from './components/AreaCard';
 import MonthlyCalendar from './components/MonthlyCalendar';
 import { CleaningWeek, UserProgress, Person } from './types';
+import {
+  updateTaskStatus,
+  loadProgressFromSupabase,
+  syncPreferencesToSupabase,
+  subscribeToProgressUpdates,
+  loadPreferencesFromSupabase
+} from './services/supabaseSync';
+import { UserProvider, useUser } from './components/UserContext';
+import UserSelector from './components/UserSelector';
+import SyncStatus from './components/SyncStatus';
+import ProfileEditor from './components/ProfileEditor';
 import * as LucideIcons from 'lucide-react';
+import { supabase } from './lib/supabase';
 
-const { 
-  ChevronLeft, 
-  ChevronRight, 
-  MapPin, 
-  LayoutGrid, 
-  Columns, 
-  Languages, 
-  ArrowUpDown, 
-  Settings, 
-  X, 
+const {
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  LayoutGrid,
+  Columns,
+  Languages,
+  ArrowUpDown,
+  Settings,
+  X,
   Palette,
   CheckCircle2,
   CalendarPlus,
@@ -24,7 +37,8 @@ const {
   Check,
   ChevronDown,
   Sun,
-  Moon
+  Moon,
+  UserCircle
 } = LucideIcons;
 
 const translations = {
@@ -44,7 +58,8 @@ const translations = {
     responsible: "Responsabile",
     addToCalendar: "Aggiungi al calendario",
     showTasks: "Mostra dettagli",
-    hideTasks: "Nascondi dettagli"
+    hideTasks: "Nascondi dettagli",
+    profile: "Profilo"
   },
   en: {
     week: "Week",
@@ -62,7 +77,8 @@ const translations = {
     responsible: "Assignee",
     addToCalendar: "Add to Calendar",
     showTasks: "Show details",
-    hideTasks: "Hide details"
+    hideTasks: "Hide details",
+    profile: "Profile"
   }
 };
 
@@ -73,10 +89,11 @@ const defaultColors: Record<Person, string> = {
   Mariana: 'violet'
 };
 
-const App: React.FC = () => {
+const MainContent: React.FC = () => {
+  const { currentUser } = useUser();
   const [lang, setLang] = useState<'it' | 'en'>('it');
   const t = translations[lang];
-  
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('flatmate_theme');
     if (saved) return saved as 'light' | 'dark';
@@ -87,10 +104,11 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
   const [isSorted, setIsSorted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [selectedTask, setSelectedTask] = useState<{ weekId: number, areaId: string } | null>(null);
   const [subTaskProgress, setSubTaskProgress] = useState<Record<string, boolean>>({});
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
-  
+
   const [userColors, setUserColors] = useState<Record<Person, string>>(() => {
     const saved = localStorage.getItem('flatmate_colors');
     return saved ? JSON.parse(saved) : defaultColors;
@@ -108,30 +126,108 @@ const App: React.FC = () => {
   }, [weeks]);
 
   const [viewIdx, setViewIdx] = useState(currentWeekIndex);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string>('👤');
 
   useEffect(() => {
-    localStorage.setItem('cleaning_progress_v2', JSON.stringify(progress));
-  }, [progress]);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
+  // Carica progresso da Supabase al mount
   useEffect(() => {
+    const loadData = async () => {
+      setIsSyncing(true);
+      try {
+        const supabaseProgress = await loadProgressFromSupabase();
+        if (supabaseProgress && Object.keys(supabaseProgress).length > 0) {
+          setProgress(supabaseProgress);
+          localStorage.setItem('cleaning_progress_v2', JSON.stringify(supabaseProgress));
+        }
+
+        if (currentUser) {
+          const prefs = await loadPreferencesFromSupabase(currentUser);
+          if (prefs) {
+            setUserColors(prefs.colors);
+            setTheme(prefs.theme);
+            setLang(prefs.language);
+          }
+
+          // Load avatar separately if needed or part of prefs if you updated loadPreferencesFromSupabase
+          const { data } = await supabase!.from('user_preferences').select('avatar_url').eq('user_name', currentUser).single();
+          if (data?.avatar_url) setUserAvatar(data.avatar_url);
+        }
+        setLastSynced(new Date());
+      } catch (error) {
+        console.error('Errore caricamento:', error);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    loadData();
+  }, [currentUser]);
+
+  // Sottoscrizione real-time
+  useEffect(() => {
+    const unsubscribe = subscribeToProgressUpdates(() => {
+      loadProgressFromSupabase().then(updatedProgress => {
+        setProgress(updatedProgress);
+        localStorage.setItem('cleaning_progress_v2', JSON.stringify(updatedProgress));
+        setLastSynced(new Date());
+      });
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sincronizza preferenze
+  useEffect(() => {
+    if (!currentUser) return;
     localStorage.setItem('flatmate_colors', JSON.stringify(userColors));
-  }, [userColors]);
+    localStorage.setItem('flatmate_theme', theme);
+
+    syncPreferencesToSupabase(currentUser, userColors, theme, lang);
+  }, [userColors, theme, lang, currentUser]);
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
-    localStorage.setItem('flatmate_theme', theme);
   }, [theme]);
 
-  const toggleTask = (weekId: number, areaId: string) => {
-    setProgress(prev => ({
-      ...prev,
+  const handleToggleTask = async (weekId: number, areaId: string) => {
+    if (!currentUser) return;
+
+    // Optimistic update
+    const isCompleted = !progress[weekId]?.[areaId as keyof UserProgress[number]];
+    const newProgress = {
+      ...progress,
       [weekId]: {
-        ...(prev[weekId] || {}),
-        [areaId]: !prev[weekId]?.[areaId as keyof UserProgress[number]]
+        ...(progress[weekId] || {}),
+        [areaId]: isCompleted
       }
-    }));
+    };
+
+    setProgress(newProgress);
+    setIsSyncing(true);
+
+    try {
+      await updateTaskStatus(weekId, areaId, isCompleted, currentUser);
+      setLastSynced(new Date());
+    } catch (error) {
+      console.error('Initial sync failed, reverting...', error);
+      // Revert on failure could be implemented here
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const currentViewData = weeks[viewIdx];
@@ -182,15 +278,30 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-12 pb-32">
+    <div className="max-w-7xl mx-auto p-4 md:p-12 pb-32 relative">
+      <UserSelector />
+      <SyncStatus isSyncing={isSyncing} isOnline={isOnline} lastSyncedAt={lastSynced} />
+      <ProfileEditor isOpen={showProfile} onClose={() => setShowProfile(false)} />
+
       <header className="mb-8 md:mb-12 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl md:text-5xl font-[900] text-slate-900 dark:text-white tracking-tight leading-none">
             FlatMate <span className="text-indigo-600 dark:text-indigo-400">Albere 9</span>
           </h1>
+          {currentUser && (
+            <div className="text-sm font-bold text-slate-500 flex items-center gap-2">
+              <span>Ciao, {currentUser}</span>
+              <button onClick={() => setShowProfile(true)} className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                {userAvatar !== '👤' ? userAvatar : <UserCircle size={14} />}
+              </button>
+            </div>
+          )}
         </div>
-        
+
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowProfile(true)} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all md:hidden">
+            <UserCircle size={18} />
+          </button>
           <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -266,7 +377,7 @@ const App: React.FC = () => {
                     iconName={area.iconName}
                     assignee={area.assignee}
                     isDone={isDone}
-                    onToggle={() => {}} 
+                    onToggle={() => { }}
                     isHighlighted={isNow}
                     isOverdue={isPast && !isDone}
                     startDate={currentViewData.startDate}
@@ -280,7 +391,7 @@ const App: React.FC = () => {
           </section>
         </div>
       ) : (
-        <MonthlyCalendar weeks={weeks} progress={progress} onToggle={toggleTask} lang={lang} customColors={userColors} />
+        <MonthlyCalendar weeks={weeks} progress={progress} onToggle={handleToggleTask} lang={lang} customColors={userColors} />
       )}
 
       {/* Task Detail Modal */}
@@ -288,7 +399,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 overflow-hidden">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md dark:bg-slate-950/80" onClick={() => setSelectedTask(null)}></div>
           <div className="relative bg-white dark:bg-slate-900 rounded-[3rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col border dark:border-white/10">
-            
+
             {/* Modal Header */}
             <div className="p-8 pb-0 md:p-12 md:pb-0 flex-shrink-0">
               <div className="flex justify-between items-start mb-6">
@@ -315,7 +426,7 @@ const App: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-8 md:px-12 py-4 custom-scrollbar">
               <div className="bg-slate-50 dark:bg-slate-950/50 rounded-[2rem] border border-slate-100 dark:border-white/5 overflow-hidden">
                 {/* Accordion Header */}
-                <button 
+                <button
                   onClick={() => setIsAccordionOpen(!isAccordionOpen)}
                   className="w-full flex items-center justify-between p-6 transition-colors hover:bg-slate-100/50 dark:hover:bg-slate-800/50 text-left"
                 >
@@ -323,9 +434,9 @@ const App: React.FC = () => {
                     <Info size={16} className="text-indigo-400" />
                     <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-600">{t.whatToDo}</span>
                   </div>
-                  <ChevronDown 
-                    size={20} 
-                    className={`text-slate-400 dark:text-slate-600 transition-transform duration-300 ${isAccordionOpen ? 'rotate-180' : ''}`} 
+                  <ChevronDown
+                    size={20}
+                    className={`text-slate-400 dark:text-slate-600 transition-transform duration-300 ${isAccordionOpen ? 'rotate-180' : ''}`}
                   />
                 </button>
 
@@ -333,18 +444,18 @@ const App: React.FC = () => {
                 <div className={`transition-all duration-300 ease-in-out ${isAccordionOpen ? 'max-h-96 opacity-100 pb-6 px-6' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                   <div className="space-y-1.5 pt-2">
                     {(areaSubTasks[activeTaskData.area.id]?.[lang] || []).map((subTask, idx) => (
-                      <label 
-                        key={idx} 
+                      <label
+                        key={idx}
                         className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group hover:bg-white dark:hover:bg-slate-800 ${subTaskProgress[idx] ? 'bg-white/50 dark:bg-slate-800/50' : ''}`}
                       >
-                        <input 
-                          type="checkbox" 
-                          className="hidden" 
-                          checked={!!subTaskProgress[idx]} 
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={!!subTaskProgress[idx]}
                           onChange={(e) => {
                             e.stopPropagation();
-                            setSubTaskProgress(prev => ({...prev, [idx]: !prev[idx]}));
-                          }} 
+                            setSubTaskProgress(prev => ({ ...prev, [idx]: !prev[idx] }));
+                          }}
                         />
                         <div className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all ${subTaskProgress[idx] ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-slate-700 text-transparent group-hover:border-indigo-400'}`}>
                           <Check size={14} strokeWidth={4} />
@@ -361,9 +472,9 @@ const App: React.FC = () => {
 
             {/* Modal Actions */}
             <div className="p-8 md:p-12 pt-4 flex-shrink-0 space-y-4">
-              <button 
+              <button
                 onClick={() => {
-                  toggleTask(activeTaskData.week.id, activeTaskData.area.id);
+                  handleToggleTask(activeTaskData.week.id, activeTaskData.area.id);
                   setSelectedTask(null);
                 }}
                 className={`w-full py-5 rounded-[1.8rem] font-black text-sm tracking-widest flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-xl ${activeTaskData.isDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'bg-emerald-500 text-white shadow-emerald-200 dark:shadow-none'}`}
@@ -371,8 +482,8 @@ const App: React.FC = () => {
                 <CheckCircle2 size={20} />
                 {(activeTaskData.isDone ? t.markUndone : t.markDone).toUpperCase()}
               </button>
-              
-              <button 
+
+              <button
                 onClick={handleAddToCalendar}
                 className="w-full py-5 rounded-[1.8rem] border-2 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-black text-[10px] tracking-widest flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-100 dark:hover:border-indigo-900/50 transition-all"
               >
@@ -427,9 +538,9 @@ const App: React.FC = () => {
       )}
 
       <footer className="mt-16 text-center">
-         <p className="text-slate-400 dark:text-slate-700 text-[9px] uppercase tracking-[0.4em] font-black opacity-30">FlatMate Albere 9 &bull; 2026</p>
+        <p className="text-slate-400 dark:text-slate-700 text-[9px] uppercase tracking-[0.4em] font-black opacity-30">FlatMate Albere 9 &bull; 2026</p>
       </footer>
-      
+
       <style>{`
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .animate-shimmer { animation: shimmer 2s infinite ease-in-out; }
@@ -445,6 +556,14 @@ const App: React.FC = () => {
         }
       `}</style>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <UserProvider>
+      <MainContent />
+    </UserProvider>
   );
 };
 

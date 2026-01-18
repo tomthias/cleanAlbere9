@@ -11,8 +11,10 @@ const rotationPattern: Record<string, Person[]> = {
 
 export const generateCalendar = (): CleaningWeek[] => {
   const weeks: CleaningWeek[] = [];
-  let currentStart = new Date(2025, 11, 29); 
-  
+  // CRITICAL: This date MUST remain fixed to ensure deterministic rotations.
+  // Changing this date will shift all future assignments.
+  let currentStart = new Date(2025, 11, 29);
+
   for (let i = 0; i < 105; i++) {
     const weekId = i + 1;
     const endDate = new Date(currentStart);
@@ -44,6 +46,6 @@ export const formatDateRange = (start: Date, end: Date, lang: 'it' | 'en' = 'it'
   const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
   const locale = lang === 'it' ? 'it-IT' : 'en-US';
   const displayYear = end.getFullYear();
-  
+
   return `${start.toLocaleDateString(locale, options)} - ${end.toLocaleDateString(locale, options)} ${displayYear}`;
 };
