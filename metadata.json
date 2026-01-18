@@ -1,0 +1,5 @@
+{
+  "name": "FlatMate Clean - Calendario Pulizie",
+  "description": "App interattiva per la gestione dei turni di pulizia dell'appartamento, basata sul calendario rotativo di Mattia, Martina, Mariana e Shapa.",
+  "requestFramePermissions": []
+}
