@@ -243,6 +243,12 @@ const MainContent: React.FC = () => {
     return () => clearTimeout(syncTimeout);
   }, [userColors, theme, lang, currentUser, userDisplayName, userAvatar]);
 
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+  }, [theme]);
+
   const closeModal = () => {
     setSelectedTask(null);
     setIsActionLocked(true);
