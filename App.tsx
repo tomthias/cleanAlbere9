@@ -30,8 +30,20 @@ const {
   Check,
   ArrowLeftRight,
   Clock,
-  MapPin
+  MapPin,
+  AlertTriangle,
+  Bell
 } = LucideIcons;
+
+// Funzione per verificare se è troppo tardi per fare swap (dopo giovedì 23:00)
+const isSwapDeadlinePassed = (weekStartDate: Date): boolean => {
+  const now = new Date();
+  // Giovedì = 4 (0=domenica, 1=lunedì, ..., 4=giovedì)
+  const thursday = new Date(weekStartDate);
+  thursday.setDate(weekStartDate.getDate() + 4); // +4 giorni da lunedì (inizio settimana) = giovedì
+  thursday.setHours(23, 0, 0, 0);
+  return now > thursday;
+};
 
 const translations = {
   it: {
@@ -56,7 +68,10 @@ const translations = {
     cancelSwap: "Annulla Richiesta",
     acceptSwap: "Accetta Cambio",
     pendingSwap: "Richiesta in sospeso",
-    swappedWith: "Sostituito da"
+    swappedWith: "Sostituito da",
+    swapTooLate: "Troppo tardi per cambiare questa settimana! (dopo giovedì 23:00)",
+    swapAlert: "vuole scambiare",
+    swapAlertAction: "Apri per rispondere"
   },
   en: {
     week: "Week",
@@ -80,7 +95,10 @@ const translations = {
     cancelSwap: "Cancel Request",
     acceptSwap: "Accept Swap",
     pendingSwap: "Pending request",
-    swappedWith: "Replaced by"
+    swappedWith: "Replaced by",
+    swapTooLate: "Too late to swap this week! (after Thursday 11pm)",
+    swapAlert: "wants to swap",
+    swapAlertAction: "Open to respond"
   }
 };
 
@@ -97,7 +115,8 @@ const MainContent: React.FC = () => {
     userAvatar, setUserAvatar,
     userDisplayName, setUserDisplayName,
     toggleTask,
-    isOnline
+    isOnline,
+    refreshSwaps
   } = useCleaningData(currentUser);
 
   const t = translations[lang];
@@ -159,6 +178,20 @@ const MainContent: React.FC = () => {
     const pendingSwap = swaps.find(s => s.week_id === week.id && s.area_id === area.id && s.status === 'pending');
     return { week, area, assignee, isDone, pendingSwap };
   }, [selectedTask, activeWeeks, progress, swaps]);
+
+  // Richieste swap pendenti per la settimana corrente (da mostrare come alert)
+  const pendingSwapRequests = useMemo(() => {
+    if (!currentUser) return [];
+    // Trova swap pendenti dove l'utente corrente NON è chi ha richiesto (quindi può accettare)
+    return swaps.filter(s =>
+      s.status === 'pending' &&
+      s.original_person !== currentUser &&
+      s.week_id === currentViewDataSwapped.id
+    ).map(s => {
+      const area = AREAS.find(a => a.id === s.area_id);
+      return { ...s, areaLabel: area ? (lang === 'it' ? area.label : area.labelEn) : s.area_id };
+    });
+  }, [swaps, currentUser, currentViewDataSwapped.id, lang]);
 
   const handleAddToCalendar = () => {
     if (!activeTaskData) return;
@@ -236,6 +269,34 @@ const MainContent: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Alert per richieste swap pendenti */}
+      {pendingSwapRequests.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {pendingSwapRequests.map(swap => (
+            <div
+              key={swap.id}
+              onClick={() => {
+                setSubTaskProgress({});
+                setIsAccordionOpen(false);
+                setSelectedTask({ weekId: swap.week_id, areaId: swap.area_id });
+              }}
+              className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all"
+            >
+              <div className="p-2 bg-amber-100 dark:bg-amber-800/50 rounded-xl">
+                <Bell size={18} className="text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-amber-800 dark:text-amber-200 text-sm">
+                  {swap.original_person} {t.swapAlert} <span className="text-amber-600 dark:text-amber-400">{swap.areaLabel}</span>
+                </p>
+                <p className="text-amber-600 dark:text-amber-500 text-xs">{t.swapAlertAction}</p>
+              </div>
+              <ArrowLeftRight size={16} className="text-amber-400" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {viewMode === 'weekly' ? (
         <WeeklyView
@@ -373,12 +434,23 @@ const MainContent: React.FC = () => {
               {/* Swap Button */}
               {currentUser && (
                 <div className="mt-6 border-t dark:border-white/5 pt-6">
-                  {!activeTaskData.pendingSwap ? (
+                  {/* Blocco swap dopo giovedì 23:00 */}
+                  {isSwapDeadlinePassed(activeTaskData.week.startDate) ? (
+                    <div className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-500 dark:text-slate-400">
+                      <AlertTriangle size={18} />
+                      <span className="text-[11px] font-bold">{t.swapTooLate}</span>
+                    </div>
+                  ) : !activeTaskData.pendingSwap ? (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
                         if (window.confirm(`${t.requestSwap}?`)) {
-                          await createSwapRequest(activeTaskData.week.id, activeTaskData.area.id, activeTaskData.assignee);
+                          try {
+                            await createSwapRequest(activeTaskData.week.id, activeTaskData.area.id, activeTaskData.assignee);
+                            await refreshSwaps();
+                          } catch (err) {
+                            console.error('Swap request failed:', err);
+                          }
                           closeModal();
                         }
                       }}
@@ -393,7 +465,12 @@ const MainContent: React.FC = () => {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            await cancelSwapRequest(activeTaskData.pendingSwap!.id);
+                            try {
+                              await cancelSwapRequest(activeTaskData.pendingSwap!.id);
+                              await refreshSwaps();
+                            } catch (err) {
+                              console.error('Cancel swap failed:', err);
+                            }
                             closeModal();
                           }}
                           className="w-full py-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 font-black text-[11px] tracking-widest flex items-center justify-center gap-3 transition-all"
@@ -406,7 +483,12 @@ const MainContent: React.FC = () => {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (window.confirm(`${t.acceptSwap}?`)) {
-                              await acceptSwapRequest(activeTaskData.pendingSwap!.id, currentUser as Person);
+                              try {
+                                await acceptSwapRequest(activeTaskData.pendingSwap!.id, currentUser as Person);
+                                await refreshSwaps();
+                              } catch (err) {
+                                console.error('Accept swap failed:', err);
+                              }
                               closeModal();
                             }
                           }}

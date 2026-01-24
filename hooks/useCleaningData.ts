@@ -145,7 +145,7 @@ export const useCleaningData = (currentUser: Person | null) => {
         return () => clearTimeout(syncTimeout);
     }, [userColors, theme, lang, currentUser, userDisplayName, userAvatar]);
 
-    // Computed data
+    // Computed data - applica gli swap accettati alle settimane
     const activeWeeks = useMemo(() => {
         return weeks.map(week => {
             const weekSwaps = swaps.filter(s => s.week_id === week.id && s.status === 'accepted');
@@ -189,6 +189,16 @@ export const useCleaningData = (currentUser: Person | null) => {
         }
     };
 
+    // Funzione per ricaricare gli swaps manualmente
+    const refreshSwaps = async () => {
+        try {
+            const activeSwaps = await loadSwaps();
+            setSwaps(activeSwaps);
+        } catch (error) {
+            console.error('Error refreshing swaps:', error);
+        }
+    };
+
     return {
         lang, setLang,
         theme, setTheme,
@@ -200,6 +210,7 @@ export const useCleaningData = (currentUser: Person | null) => {
         userAvatar, setUserAvatar,
         userDisplayName, setUserDisplayName,
         toggleTask,
-        isOnline
+        isOnline,
+        refreshSwaps
     };
 };

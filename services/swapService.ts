@@ -11,6 +11,20 @@ export const createSwapRequest = async (
 ): Promise<void> => {
     if (!supabase) return;
 
+    // Check if there's already an active swap for this week/area
+    const { data: existing } = await supabase
+        .from('area_swaps')
+        .select('id')
+        .eq('week_id', weekId)
+        .eq('area_id', areaId)
+        .in('status', ['pending', 'accepted'])
+        .maybeSingle();
+
+    if (existing) {
+        console.warn('⚠️ Swap request already exists for this week/area');
+        return;
+    }
+
     const { error } = await supabase
         .from('area_swaps')
         .insert({
