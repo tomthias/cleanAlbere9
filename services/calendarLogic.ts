@@ -3,7 +3,7 @@ import { CleaningWeek, Person } from '../types';
 
 const rotationPattern: Record<string, Person[]> = {
   cucina: ['Martina', 'Shapa', 'Mattia'], // Mariana esclusa
-  cestino: ['Martina', 'Shapa', 'Mattia', 'Mariana'],
+  cestino: ['Martina', 'Shapa', 'Mattia'], // Mariana esclusa
   bagno1: ['Martina', 'Mattia', 'Martina', 'Mattia'],
   bagno2: ['Shapa', 'Mariana', 'Shapa', 'Mariana'],
   ingressoLavanderia: ['Mattia', 'Martina', 'Mariana', 'Shapa']
