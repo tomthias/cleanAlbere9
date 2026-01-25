@@ -1,19 +1,21 @@
 
 import { CleaningWeek, Person } from '../types';
 
+// Rotazioni randomizzate a partire dal 9 febbraio 2025
+// Mariana esclusa da cucina e cestino
+// Bagni separati: bagno1 = Martina/Mattia, bagno2 = Shapa/Mariana
 const rotationPattern: Record<string, Person[]> = {
-  cucina: ['Martina', 'Shapa', 'Mattia'], // Mariana esclusa
-  cestino: ['Martina', 'Shapa', 'Mattia'], // Mariana esclusa
-  bagno1: ['Martina', 'Mattia', 'Martina', 'Mattia'],
-  bagno2: ['Shapa', 'Mariana', 'Shapa', 'Mariana'],
-  ingressoLavanderia: ['Mattia', 'Martina', 'Mariana', 'Shapa']
+  cucina: ['Shapa', 'Mattia', 'Martina'], // Mariana esclusa
+  cestino: ['Mattia', 'Martina', 'Shapa'], // Mariana esclusa
+  bagno1: ['Mattia', 'Martina'], // Solo Mattia e Martina
+  bagno2: ['Shapa', 'Mariana'], // Solo Shapa e Mariana
+  ingressoLavanderia: ['Martina', 'Mariana', 'Shapa', 'Mattia']
 };
 
 export const generateCalendar = (): CleaningWeek[] => {
   const weeks: CleaningWeek[] = [];
-  // CRITICAL: This date MUST remain fixed to ensure deterministic rotations.
-  // Changing this date will shift all future assignments.
-  let currentStart = new Date(2025, 11, 29);
+  // Data di inizio: 9 febbraio 2025 (domenica)
+  let currentStart = new Date(2025, 1, 9);
 
   for (let i = 0; i < 105; i++) {
     const weekId = i + 1;
