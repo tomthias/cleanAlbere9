@@ -114,6 +114,7 @@ const MainContent: React.FC = () => {
     isSyncing, lastSynced,
     userAvatar, setUserAvatar,
     userDisplayName, setUserDisplayName,
+    allUsersProfiles,
     toggleTask,
     isOnline,
     refreshSwaps
@@ -321,6 +322,7 @@ const MainContent: React.FC = () => {
           }}
           onToggleTask={toggleTask}
           userColors={userColors}
+          userProfiles={allUsersProfiles}
         />
       ) : (
         <MonthlyCalendar

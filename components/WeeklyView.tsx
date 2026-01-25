@@ -2,7 +2,8 @@ import React from 'react';
 import * as LucideIcons from 'lucide-react';
 import { formatDateRange } from '../services/calendarLogic';
 import AreaCard from './AreaCard';
-import { CleaningWeek, UserProgress, SwapRequest, Person } from '../types';
+import { CleaningWeek, UserProgress, Person } from '../types';
+import { UserProfile } from '../services/supabaseSync';
 import { AREAS } from '../constants';
 
 const { ChevronLeft, ChevronRight, ArrowUpDown, Clock } = LucideIcons;
@@ -25,6 +26,7 @@ interface WeeklyViewProps {
     onSelectTask: (weekId: number, areaId: string) => void;
     onToggleTask: (weekId: number, areaId: string) => void;
     userColors: Record<Person, string>;
+    userProfiles: Record<Person, UserProfile>;
 }
 
 const WeeklyView: React.FC<WeeklyViewProps> = ({
@@ -44,7 +46,8 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({
     isActionLocked,
     onSelectTask,
     onToggleTask,
-    userColors
+    userColors,
+    userProfiles
 }) => {
     return (
         <div className="flex flex-col gap-8">
@@ -122,6 +125,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({
                                 endDate={currentViewDataSwapped.endDate}
                                 lang={lang}
                                 customColor={userColors[area.assignee]}
+                                userProfile={userProfiles[area.assignee]}
                             />
                             {area.pendingSwap && (
                                 <div className="absolute top-4 right-4 bg-amber-500 text-white p-1.5 rounded-full shadow-lg animate-pulse pointer-events-none">

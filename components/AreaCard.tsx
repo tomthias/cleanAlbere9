@@ -2,6 +2,7 @@
 import React from 'react';
 import { Person } from '../types';
 import * as LucideIcons from 'lucide-react';
+import { UserProfile } from '../services/supabaseSync';
 
 interface AreaCardProps {
   id: string;
@@ -16,6 +17,7 @@ interface AreaCardProps {
   endDate: Date;
   lang: 'it' | 'en';
   customColor?: string;
+  userProfile?: UserProfile;
 }
 
 export const areaSubTasks: Record<string, { it: string[], en: string[] }> = {
@@ -51,7 +53,8 @@ const AreaCard: React.FC<AreaCardProps> = ({
   isHighlighted,
   isOverdue,
   lang,
-  customColor
+  customColor,
+  userProfile
 }) => {
   // @ts-ignore
   const IconComponent = LucideIcons[iconName] || LucideIcons.HelpCircle;
@@ -134,8 +137,13 @@ const AreaCard: React.FC<AreaCardProps> = ({
       </div>
 
       <div className="mt-auto pt-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className={`text-[11px] font-black ${theme.text}`}>{assignee.toUpperCase()}</span>
+        <div className="flex items-center gap-2">
+          {userProfile?.avatar && userProfile.avatar !== '👤' && (
+            <span className="text-lg">{userProfile.avatar}</span>
+          )}
+          <span className={`text-[11px] font-black ${theme.text}`}>
+            {(userProfile?.displayName || assignee).toUpperCase()}
+          </span>
         </div>
         <div className={`text-xl font-black transition-transform group-hover:translate-x-1 ${isDone ? 'text-slate-300 dark:text-slate-700' : 'text-indigo-600/80 dark:text-indigo-400'}`}>
           →

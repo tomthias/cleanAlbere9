@@ -7,7 +7,9 @@ import {
     syncPreferencesToSupabase,
     subscribeToProgressUpdates,
     subscribeToPreferenceUpdates,
-    loadPreferencesFromSupabase
+    loadPreferencesFromSupabase,
+    loadAllUsersProfiles,
+    UserProfile
 } from '../services/supabaseSync';
 import {
     loadSwaps,
@@ -46,6 +48,12 @@ export const useCleaningData = (currentUser: Person | null) => {
     const [userAvatar, setUserAvatar] = useState<string>('👤');
     const [userDisplayName, setUserDisplayName] = useState<string>('');
     const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [allUsersProfiles, setAllUsersProfiles] = useState<Record<Person, UserProfile>>({
+        Mattia: { avatar: '👤', displayName: 'Mattia' },
+        Martina: { avatar: '👤', displayName: 'Martina' },
+        Shapa: { avatar: '👤', displayName: 'Shapa' },
+        Mariana: { avatar: '👤', displayName: 'Mariana' }
+    });
 
     const isInitialLoading = useRef(true);
 
@@ -85,6 +93,11 @@ export const useCleaningData = (currentUser: Person | null) => {
 
                 const activeSwaps = await loadSwaps();
                 setSwaps(activeSwaps);
+
+                // Load all users profiles for display in cards
+                const profiles = await loadAllUsersProfiles();
+                setAllUsersProfiles(profiles);
+
                 setLastSynced(new Date());
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -209,6 +222,7 @@ export const useCleaningData = (currentUser: Person | null) => {
         isSyncing, lastSynced,
         userAvatar, setUserAvatar,
         userDisplayName, setUserDisplayName,
+        allUsersProfiles,
         toggleTask,
         isOnline,
         refreshSwaps

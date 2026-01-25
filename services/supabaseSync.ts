@@ -183,6 +183,52 @@ export const subscribeToProgressUpdates = (
   }
 }
 
+export interface UserProfile {
+  avatar: string;
+  displayName: string;
+}
+
+/**
+ * Carica i profili (avatar + displayName) di tutti gli utenti
+ */
+export const loadAllUsersProfiles = async (): Promise<Record<Person, UserProfile>> => {
+  const defaultProfiles: Record<Person, UserProfile> = {
+    Mattia: { avatar: '👤', displayName: 'Mattia' },
+    Martina: { avatar: '👤', displayName: 'Martina' },
+    Shapa: { avatar: '👤', displayName: 'Shapa' },
+    Mariana: { avatar: '👤', displayName: 'Mariana' }
+  };
+
+  if (!supabase) return defaultProfiles;
+
+  try {
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('user_name, avatar_url, display_name');
+
+    if (error) {
+      console.error('❌ Errore loadAllUsersProfiles:', error);
+      return defaultProfiles;
+    }
+
+    const profiles = { ...defaultProfiles };
+    data?.forEach((item) => {
+      if (item.user_name) {
+        const person = item.user_name as Person;
+        profiles[person] = {
+          avatar: item.avatar_url || '👤',
+          displayName: item.display_name || person
+        };
+      }
+    });
+
+    return profiles;
+  } catch (error) {
+    console.error('❌ Errore loadAllUsersProfiles:', error);
+    return defaultProfiles;
+  }
+};
+
 export const subscribeToPreferenceUpdates = (
   userName: Person,
   onUpdate: () => void
