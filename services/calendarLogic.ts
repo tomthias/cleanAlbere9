@@ -2,11 +2,10 @@
 import { CleaningWeek, Person } from '../types';
 
 // Rotazioni randomizzate a partire dal 9 febbraio 2025
-// Mariana esclusa da cucina e cestino
 // Bagni separati: bagno1 = Martina/Mattia, bagno2 = Shapa/Mariana
 const rotationPattern: Record<string, Person[]> = {
-  cucina: ['Shapa', 'Mattia', 'Martina'], // Mariana esclusa
-  cestino: ['Mattia', 'Martina', 'Shapa'], // Mariana esclusa
+  cucina: ['Shapa', 'Mattia', 'Martina'],
+  cestino: ['Mattia', 'Martina', 'Shapa', 'Mariana'],
   bagno1: ['Mattia', 'Martina'], // Solo Mattia e Martina
   bagno2: ['Shapa', 'Mariana'], // Solo Shapa e Mariana
   ingressoLavanderia: ['Martina', 'Mariana', 'Shapa', 'Mattia']
